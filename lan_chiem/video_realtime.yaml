@@ -1,0 +1,18 @@
+# Candidate profile; target must be measured on the actual Colab T4/video.
+keyframe_interval: 3
+min_detection_interval: 2
+weak_track_fraction: 0.5
+frame_step: 1
+work_max_side: 960
+tracking_max_side: 480
+min_hits: 2
+max_lost_seconds: 1.0
+max_prediction_seconds: 0.5
+segment_frames: 300
+precision: fp16
+log_interval: 2.0
+preview_interval: 0.0
+target_fps: 9.0
+cv_threads: 1
+warmup_runs: 2
+fast_render: true

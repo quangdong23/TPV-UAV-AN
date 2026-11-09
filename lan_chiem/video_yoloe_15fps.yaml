@@ -1,0 +1,24 @@
+# Candidate measured on RTX 3050 Ti; validate quality on your deployment video.
+keyframe_interval: 5
+min_detection_interval: 3
+weak_track_fraction: 0.5
+frame_step: 1
+work_max_side: 0
+tracking_max_side: 480
+min_hits: 2
+max_lost_seconds: 1.0
+max_prediction_seconds: 0.4
+max_static_lost_seconds: 2.5
+max_static_prediction_seconds: 1.2
+segment_frames: 300
+precision: fp16
+log_interval: 3.0
+preview_interval: 0.0
+target_fps: 15.0
+# Four threads matched motion outputs exactly and reduced motion time in review2.
+cv_threads: 4
+warmup_runs: 3
+fast_render: true
+roi_detection_interval: 3
+# Bounded two-frame encoder queue; checkpoint waits for every frame to be written.
+async_encode: true

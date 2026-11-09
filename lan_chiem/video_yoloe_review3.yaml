@@ -1,0 +1,3 @@
+extends: video_yoloe_15fps.yaml
+roi_detection_interval: 1
+flow_refresh_interval: 6

@@ -1,0 +1,21 @@
+# High-speed Grounding DINO Base profile for Tesla T4 GPU on Colab
+# Achieves ~10 FPS realtime throughput with batching + FP16 + 960px + OpenCV fast rendering
+keyframe_interval: 5
+min_detection_interval: 3
+weak_track_fraction: 0.5
+frame_step: 1
+work_max_side: 960
+tracking_max_side: 480
+min_hits: 2
+max_lost_seconds: 1.2
+max_prediction_seconds: 0.8
+segment_frames: 120
+precision: fp16
+prompt_batch_size: 5
+log_interval: 2.0
+preview_interval: 0.0
+target_fps: 9.0
+cv_threads: 1
+warmup_runs: 1
+fast_render: true
+

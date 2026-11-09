@@ -1,0 +1,3 @@
+extends: yoloe_materials_trial.yaml
+model:
+  reparameterize: true

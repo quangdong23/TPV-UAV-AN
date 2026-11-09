@@ -1,0 +1,18 @@
+# Detect every frame at full input resolution; no skipped source frames.
+keyframe_interval: 1
+min_detection_interval: 1
+weak_track_fraction: 0.5
+frame_step: 1
+work_max_side: 0
+tracking_max_side: 640
+min_hits: 2
+max_lost_seconds: 0.5
+max_prediction_seconds: 0.2
+segment_frames: 300
+precision: fp32
+log_interval: 3.0
+preview_interval: 5.0
+target_fps: 15.0
+cv_threads: 1
+warmup_runs: 3
+fast_render: true

@@ -1,0 +1,10 @@
+# Candidate: broad spatial coverage, original complete target vocabulary.
+extends: config.yaml
+model:
+  roi_strategy: grid
+  roi_overlap: 0.2
+  roi_max_patches: 12
+  roi_batch_size: 2
+review_rules:
+  same_head_counter_policy: stronger
+  spatial_context_review: false

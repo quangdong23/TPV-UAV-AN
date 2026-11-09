@@ -4,8 +4,10 @@ __pycache__/
 *.py[cod]
 
 # Generated model results and local caches
-outputs/
+outputs
 .hf_cache/
+datasets/
+runs
 
 # Editor-specific local settings
 .vscode/

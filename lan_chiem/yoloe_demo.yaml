@@ -1,0 +1,9 @@
+extends: yoloe_single.yaml
+model:
+  imgsz: 1280
+  roi_strategy: seeded
+hybrid_demo:
+  model_id: IDEA-Research/grounding-dino-tiny
+  threshold: 0.2
+  shortest_edge: 512
+  longest_edge: 853

@@ -1,0 +1,529 @@
+model:
+  backend: yoloe
+  model_id: yoloe-v8s-single.pt
+  weights: lan_chiem/models/yoloe-v8s-single.pt
+  device: auto
+  imgsz: 960
+  precision: fp16
+  roi_focus: true
+  roi_patch_size: 640
+  roi_max_patches: 1
+  target_phrases:
+    1:
+    - person
+    - seated person
+    2:
+    - motorcycle
+    - motor scooter
+    - motorbike
+    3:
+    - car
+    - passenger car
+    4:
+    - plastic table
+    - rectangular plastic table
+    - small plastic table
+    - plastic folding table
+    - low plastic table
+    5:
+    - plastic chair
+    - plastic stool
+    - low plastic stool
+    - small plastic stool
+    - blue plastic stool
+    - red plastic stool
+    - small red plastic stool
+    - small blue plastic stool
+    - round plastic stool
+    6:
+    - street food cart
+    - wheeled food vending cart
+    - mobile food vending cart
+    - fruit food stand
+    7:
+    - shop sign
+    - advertising signboard
+    - hanging sign
+    - store signboard
+    8:
+    - utility pole
+    - electric pole
+    9:
+    - tree trunk
+    - tree stem
+    10:
+    - basket of fruit
+    - crate of vegetables
+    - packaged products
+    - fruit crate
+    - stacked packaged goods
+  counter_phrases:
+    folding gate: barrier_gate
+    metal gate: barrier_gate
+    security gate: barrier_gate
+    iron fence: fence
+    storefront canopy: canopy
+    fabric awning: canopy
+    concrete wall: wall
+    building column: column
+    baby stroller: stroller
+    pushchair: stroller
+    bicycle: bicycle
+    truck: car
+    van: car
+    traffic sign: traffic_sign
+    barrier gate: barrier_gate
+    potted plant: potted_plant
+    pile of bricks: construction_materials
+    sand pile: construction_materials
+    styrofoam box: foam_box
+    paving slabs: construction_materials
+    concrete blocks: construction_materials
+    construction debris: construction_materials
+    pedal bicycle: bicycle
+    metal folding chair: nonplastic_chair
+    metal table: nonplastic_table
+  cache_text_embeddings: true
+  trunk_refiner:
+    enabled: false
+inference:
+  enable_image_feature_cache: true
+  query_mode: compact
+  mode: full
+  tile_size: 768
+  overlap_ratio: 0.25
+  nms_iou: 0.5
+  box_threshold_default: 0.25
+  text_threshold_default: 0.2
+  raw_candidate_threshold: 0.15
+  tile_small_objects_only: false
+  enable_counter_checks: true
+  enable_cart_merge: true
+  enable_leg_filter: true
+  enable_tree_filter: true
+  counter_policy: selective
+  enable_nested_dedup: true
+  compact_group_keys:
+  - compact_objects
+  - compact_trunks
+  - compact_signs
+  - compact_goods
+  - compact_stalls
+  compact_phrases:
+    1: person
+    2: motorcycle
+    3: car
+    4: plastic table
+    5: plastic stool
+    6: street food cart . wheeled food vending cart . mobile food vending cart . fruit
+      food stand
+    7: shop sign . advertising signboard . signboard . motel sign . hanging sign .
+      small sign on tree . sign board
+    8: utility pole
+    9: tree trunk
+    10: basket of fruit . crate of vegetables . fruit basket . packaged products
+cart_merge:
+  enabled: true
+  iou_threshold: 0.4
+  ios_threshold: 0.65
+  max_center_dist_ratio: 0.4
+conventions:
+  object_ids: IDs 1–10 theo danh mục objects-v3-10; không đọc ID cũ bằng mapping mới.
+  sidewalk: Mask/polygon độc lập ngoài danh mục vật thể.
+  verification: Prompt, raw_label và giao box không xác minh lớp hoặc hoạt động bán
+    hàng.
+review_rules:
+  exclusive_class_overlap: true
+  overlap_with_table: true
+  contained_in_cart_candidate: true
+  motorcycle_bicycle_overlap: true
+  table_car_overlap: true
+  table_materials_overlap: true
+  pole_trunk_overlap: true
+  cart_barrier_overlap: true
+  cart_car_overlap: true
+  cart_motorcycle_overlap: true
+  goods_plant_overlap: true
+  goods_materials_overlap: true
+  goods_chair_overlap: true
+  ambiguous_counter_overlap: true
+  tree_scope_uncertain: true
+  advertising_traffic_overlap: false
+  upright_object_geometry: true
+classes:
+  1:
+    name: người
+    display_name: Người
+    prompt: person . seated person
+    aliases:
+    - person
+    - seated person
+    - people
+    - pedestrian
+    - man
+    - woman
+    box_threshold: 0.35
+    text_threshold: 0.2
+    is_small_object: false
+    detail: Người đứng, đi hoặc ngồi; không bắt buộc nhìn thấy toàn thân.
+  2:
+    name: xe máy
+    display_name: Xe máy
+    prompt: motorcycle . motor scooter
+    aliases:
+    - motorcycle
+    - motor scooter
+    - motorbike
+    box_threshold: 0.35
+    text_threshold: 0.2
+    is_small_object: false
+    detail: Xe máy có động cơ, kể cả xe tay ga; hai bánh và tay lái không đủ phân
+      biệt với xe đạp.
+  3:
+    box_threshold: 0.35
+    text_threshold: 0.2
+    is_small_object: false
+    name: xe ô tô
+    display_name: Xe ô tô
+    prompt: car . passenger car
+    detail: Ô tô con; bốn bánh và kính chắn gió cũng xuất hiện ở xe tải nên không
+      dùng làm điều kiện phân biệt.
+    aliases:
+    - car
+    - passenger car
+    - automobile
+  4:
+    name: bàn nhựa
+    display_name: Bàn nhựa
+    prompt: plastic table . rectangular plastic table
+    aliases:
+    - plastic table
+    - rectangular plastic table
+    - table
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object: true
+    detail: Bàn nhựa, kể cả mặt vuông/chữ nhật; không yêu cầu thấy đủ bốn chân. Chất
+      liệu vẫn là dự đoán.
+  5:
+    name: ghế nhựa
+    display_name: Ghế nhựa
+    prompt: plastic chair . low plastic stool
+    aliases:
+    - plastic chair
+    - low plastic stool
+    - plastic stool
+    - chair
+    - stool
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object: true
+    detail: Ghế nhựa có tựa và ghế đẩu thấp không tựa; không ràng buộc màu sắc.
+  6:
+    name: xe hàng rong / xe đẩy bán hàng
+    display_name: Xe hàng rong / Xe đẩy bán hàng
+    prompt: street food cart . wheeled food vending cart . mobile food vending cart
+      . fruit food stand
+    aliases:
+    - street food cart
+    - wheeled food vending cart
+    - mobile food vending cart
+    - fruit food stand
+    - food vending cart
+    - food cart
+    - vending cart
+    - fruit stand
+    box_threshold: 0.35
+    text_threshold: 0.2
+    is_small_object: true
+    detail: Xe đẩy/quầy bán hàng di động; bao gồm sạp hàng hoa quả/thực phẩm vỉa hè.
+  7:
+    name: biển quảng cáo
+    display_name: Biển quảng cáo
+    prompt: shop sign . advertising signboard . signboard . hanging sign . advertising
+      board . motel sign
+    aliases:
+    - shop sign
+    - advertising signboard
+    - freestanding advertising board
+    - advertising board
+    - signboard
+    - hanging sign
+    - motel sign
+    - small sign on tree
+    - small sign
+    - sign board
+    - sign
+    - board
+    box_threshold: 0.35
+    text_threshold: 0.2
+    is_small_object: true
+    detail: Biển hiệu/quảng cáo gắn mặt tiền, đặt trên đất hoặc treo trên cây/cột.
+  8:
+    name: cột điện
+    display_name: Cột điện
+    prompt: utility pole . electric pole with cables
+    aliases:
+    - utility pole
+    - electric pole with cables
+    - electric pole
+    box_threshold: 0.25
+    text_threshold: 0.2
+    is_small_object: false
+    detail: Cột điện/cáp; dây có thể bị che hoặc quá nhỏ, không bắt buộc thấy dây
+      ở mọi box.
+  9:
+    name: thân cây
+    display_name: Thân cây
+    prompt: tree trunk . exposed tree trunk
+    aliases:
+    - tree trunk
+    - exposed tree trunk
+    - trunk
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object: false
+    detail: Phần thân cây nhìn thấy, kể cả thân nghiêng hoặc màu xám. Prompt không
+      bảo đảm loại được box tán lá.
+  10:
+    name: hàng hóa
+    display_name: Hàng hóa
+    prompt: basket of fruit . crate of vegetables . fruit basket . stacked packaged
+      products . merchandise display
+    aliases:
+    - basket of fruit
+    - crate of vegetables
+    - fruit basket
+    - stacked packaged products
+    - merchandise display
+    - basket
+    - crate
+    - fruit
+    - vegetables
+    - packaged products
+    - merchandise
+    - products
+    - basket crate
+    box_threshold: 0.22
+    text_threshold: 0.2
+    is_small_object: true
+    detail: Nội dung hàng, sản phẩm đóng gói, sọt/thùng hoa quả và cụm trưng bày.
+prompt_groups:
+  people_vehicles:
+    name_vi: Người và phương tiện
+    enabled: true
+    box_threshold: 0.25
+    text_threshold: 0.2
+    is_small_object_group: false
+    class_ids:
+    - 1
+    - 2
+    - 3
+  tables_chairs:
+    name_vi: Bàn ghế
+    enabled: true
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object_group: true
+    class_ids:
+    - 4
+    - 5
+  trunks_poles:
+    name_vi: Thân cây và cột
+    enabled: true
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object_group: false
+    class_ids:
+    - 8
+    - 9
+  vendor_vehicles:
+    name_vi: Xe bán hàng
+    enabled: true
+    box_threshold: 0.25
+    text_threshold: 0.2
+    is_small_object_group: false
+    class_ids:
+    - 6
+  signs:
+    name_vi: Biển báo
+    enabled: true
+    box_threshold: 0.22
+    text_threshold: 0.2
+    is_small_object_group: true
+    class_ids:
+    - 7
+  goods:
+    name_vi: Hàng hóa
+    enabled: true
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object_group: true
+    class_ids:
+    - 10
+  compact_signs:
+    name_vi: Biển quảng cáo
+    enabled: true
+    class_ids:
+    - 7
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object_group: true
+  compact_goods:
+    name_vi: Hàng hóa
+    enabled: true
+    class_ids:
+    - 10
+    box_threshold: 0.2
+    text_threshold: 0.2
+    is_small_object_group: true
+    distractors:
+      potted_plant:
+        prompt: potted plant . green shrub . bush
+        aliases:
+        - potted plant
+        - green shrub
+        - shrub
+        - bush
+      trash:
+        prompt: styrofoam box . trash . garbage . litter
+        aliases:
+        - styrofoam box
+        - trash
+        - garbage
+        - litter
+  compact_stalls:
+    name_vi: Quầy hàng rong / Xe bán hàng
+    enabled: true
+    class_ids:
+    - 6
+    box_threshold: 0.3
+    text_threshold: 0.2
+    is_small_object_group: true
+    distractors:
+      stroller:
+        prompt: baby stroller . stroller . pushchair
+        aliases:
+        - baby stroller
+        - stroller
+        - pushchair
+      column:
+        prompt: building column . concrete wall
+        aliases:
+        - building column
+        - concrete wall
+        - wall
+      gate:
+        prompt: folding gate . barrier gate . security gate . metal gate
+        aliases:
+        - folding gate
+        - barrier gate
+        - security gate
+        - metal gate
+        - gate
+  compact_context:
+    enabled: false
+    class_ids:
+    - 7
+    - 10
+    box_threshold: 0.22
+    text_threshold: 0.2
+    distractors:
+      potted_plant:
+        prompt: potted plant
+        aliases:
+        - potted plant
+      construction_materials:
+        prompt: construction materials
+        aliases:
+        - construction materials
+  compact_objects:
+    enabled: false
+    class_ids:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    box_threshold: 0.25
+    text_threshold: 0.2
+    distractors:
+      bicycle:
+        prompt: bicycle
+        aliases:
+        - bicycle
+      delivery_vehicle:
+        prompt: truck . van
+        aliases:
+        - truck
+        - van
+      foam_box:
+        prompt: styrofoam box
+        aliases:
+        - styrofoam box
+      barrier_gate:
+        prompt: barrier gate
+        aliases:
+        - barrier gate
+  compact_trunks:
+    enabled: false
+    class_ids:
+    - 8
+    - 9
+    box_threshold: 0.2
+    text_threshold: 0.2
+    distractors:
+      traffic_pole:
+        prompt: striped traffic bollard . road boundary marker . traffic pole . guide
+          post
+        aliases:
+        - striped traffic bollard
+        - road boundary marker
+        - traffic bollard
+        - traffic pole
+        - guide post
+        - bollard
+counter_prompts:
+  enabled: true
+  groups:
+    car:
+      prompt: car . automobile . truck . van
+      aliases:
+      - car
+      - automobile
+      - truck
+      - van
+      - suv
+    barrier_gate:
+      prompt: barrier gate . security gate post . boom barrier
+      aliases:
+      - barrier gate
+      - security gate post
+      - boom barrier
+      - gate post
+    potted_plant:
+      prompt: potted plant . flower pot . plant pot
+      aliases:
+      - potted plant
+      - flower pot
+      - plant pot
+      - ornamental plant
+    construction_materials:
+      prompt: pile of bricks . construction materials . sand pile . gravel pile
+      aliases:
+      - pile of bricks
+      - construction materials
+      - sand pile
+      - gravel pile
+      - bricks
+    bicycle:
+      prompt: bicycle . bike
+      aliases:
+      - bicycle
+      - bike
+    traffic_sign:
+      prompt: traffic sign . road traffic sign
+      aliases:
+      - traffic sign
+      - road traffic sign
+catalog_version: objects-v3-10

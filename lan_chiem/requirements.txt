@@ -1,0 +1,8 @@
+# Dependencies cho phân hệ nhận diện đối tượng lan_chiem (chỉ dùng CLI)
+torch
+torchvision
+transformers>=4.40.0,<5.0.0
+Pillow>=10.0.0
+numpy>=1.24.0
+PyYAML>=6.0
+

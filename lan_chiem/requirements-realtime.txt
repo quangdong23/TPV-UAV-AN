@@ -1,0 +1,4 @@
+-r requirements-video.txt
+ultralytics==8.3.221
+# YOLO-World computes its vocabulary embeddings once at startup.
+git+https://github.com/ultralytics/CLIP.git

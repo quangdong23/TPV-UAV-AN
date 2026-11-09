@@ -1,0 +1,10 @@
+extends: video_yoloe_single.yaml
+trunk_detection_interval_seconds: 1.2
+roi_patch_budget: 0
+tracking_max_side: 480
+keyframe_interval: 5
+min_detection_interval: 6
+video_encoder: nvenc
+work_max_side: 1280
+max_static_prediction_seconds: 2.0
+max_static_lost_seconds: 3.0

@@ -1,0 +1,77 @@
+extends: yoloe_quality.yaml
+model:
+  target_phrases:
+    1:
+    - person
+    - seated person
+    2:
+    - motorcycle
+    - motor scooter
+    - motorbike
+    3:
+    - car
+    - passenger car
+    4:
+    - plastic table
+    - rectangular plastic table
+    - small plastic table
+    - plastic folding table
+    - low plastic table
+    5:
+    - plastic chair
+    - plastic stool
+    - low plastic stool
+    - small plastic stool
+    - blue plastic stool
+    - red plastic stool
+    - small red plastic stool
+    - small blue plastic stool
+    - round plastic stool
+    6:
+    - street food cart
+    - wheeled food vending cart
+    - mobile food vending cart
+    - fruit food stand
+    7:
+    - shop sign
+    - advertising signboard
+    - hanging sign
+    - store signboard
+    8:
+    - utility pole
+    - electric pole
+    9:
+    - tree trunk
+    - tree stem
+    10:
+    - basket of fruit
+    - crate of vegetables
+    - packaged products
+    - fruit crate
+    - stacked packaged goods
+  counter_phrases:
+    folding gate: barrier_gate
+    metal gate: barrier_gate
+    security gate: barrier_gate
+    iron fence: fence
+    storefront canopy: canopy
+    fabric awning: canopy
+    concrete wall: wall
+    building column: column
+    baby stroller: stroller
+    pushchair: stroller
+    bicycle: bicycle
+    truck: car
+    van: car
+    traffic sign: traffic_sign
+    barrier gate: barrier_gate
+    potted plant: potted_plant
+    pile of bricks: construction_materials
+    sand pile: construction_materials
+    styrofoam box: foam_box
+    paving slabs: construction_materials
+    concrete blocks: construction_materials
+    construction debris: construction_materials
+    pedal bicycle: bicycle
+    metal folding chair: nonplastic_chair
+    metal table: nonplastic_table

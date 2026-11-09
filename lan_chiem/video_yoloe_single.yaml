@@ -1,0 +1,4 @@
+extends: video_yoloe_review3.yaml
+roi_patch_budget: 2
+roi_detection_interval: 1
+flow_refresh_interval: 6

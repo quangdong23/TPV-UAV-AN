@@ -1,0 +1,8 @@
+extends: yoloe_fixed_vocabulary.yaml
+model:
+  trunk_refiner:
+    enabled: false
+  cache_text_embeddings: true
+  weights: lan_chiem/models/yoloe-v8s-single.pt
+  imgsz: 1280
+  roi_max_patches: 12

@@ -1,0 +1,19 @@
+# Reference-quality baseline. Deliberately NOT a verified realtime profile.
+# Preserve image detector's FP32 and original frame resolution.
+keyframe_interval: 5
+min_detection_interval: 3
+weak_track_fraction: 0.5
+frame_step: 1
+work_max_side: 0
+tracking_max_side: 640
+min_hits: 2
+max_lost_seconds: 1.0
+max_prediction_seconds: 0.5
+segment_frames: 120
+precision: fp32
+log_interval: 2.0
+preview_interval: 0.0
+target_fps: 9.0
+cv_threads: 1
+warmup_runs: 0
+fast_render: false

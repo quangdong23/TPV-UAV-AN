@@ -1,0 +1,9 @@
+# YOLOE image/video runtime; Grounding DINO requirements are optional.
+# Version exercised by the GPU box/mask parity and throughput audit.
+ultralytics==8.4.45
+torch
+torchvision
+Pillow>=10.0.0
+numpy>=1.24.0,<3
+PyYAML>=6.0
+scipy>=1.10,<2
