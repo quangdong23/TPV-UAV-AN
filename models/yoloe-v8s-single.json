@@ -1,0 +1,376 @@
+{
+  "checkpoint": "lan_chiem/models/yoloe-v8s-single.pt",
+  "sha256": "80ccadad6beb805acb93c78db97ec1b0d764e717dea38d8a5c314c2699915dd9",
+  "source": {
+    "model_id": "yoloe-v8s-seg.pt",
+    "model_revision": "ac2b90ed23011495a3e86d89caeb3432a15129cac8d849ba121293c8fc1e0536",
+    "catalog_version": "objects-v3-10",
+    "backend": "yoloe",
+    "task": "detect",
+    "imgsz": 960,
+    "precision": "fp16",
+    "vocabulary_sha256": "85cec415ca14880e9ec4697192830d40fbd81895fc95349c261e60acef3b7f8d",
+    "reparameterized": true,
+    "trunk_refiner": null,
+    "detector_count": 1,
+    "text_embeddings": {
+      "status": "hit",
+      "key": "fc2f7769e4be32918d847968567d1043211a4d9c4f022b42b9442010eecdc5a5",
+      "path": "C:\\Users\\doanq\\Downloads\\UAV-yoloe-v8-s\\UAV\\lan_chiem\\outputs\\text_embeddings\\fc2f7769e4be32918d847968567d1043211a4d9c4f022b42b9442010eecdc5a5.npz"
+    },
+    "versions": {
+      "torch": "2.11.0+cu128",
+      "ultralytics": "8.4.45",
+      "torchvision": "0.26.0+cu128"
+    }
+  },
+  "fine_tuned": true,
+  "detector_count": 1,
+  "text_encoder_in_checkpoint": false,
+  "vocabulary": [
+    [
+      "person",
+      1,
+      null
+    ],
+    [
+      "seated person",
+      1,
+      null
+    ],
+    [
+      "motorcycle",
+      2,
+      null
+    ],
+    [
+      "motor scooter",
+      2,
+      null
+    ],
+    [
+      "motorbike",
+      2,
+      null
+    ],
+    [
+      "car",
+      3,
+      null
+    ],
+    [
+      "passenger car",
+      3,
+      null
+    ],
+    [
+      "plastic table",
+      4,
+      null
+    ],
+    [
+      "rectangular plastic table",
+      4,
+      null
+    ],
+    [
+      "small plastic table",
+      4,
+      null
+    ],
+    [
+      "plastic folding table",
+      4,
+      null
+    ],
+    [
+      "low plastic table",
+      4,
+      null
+    ],
+    [
+      "plastic chair",
+      5,
+      null
+    ],
+    [
+      "plastic stool",
+      5,
+      null
+    ],
+    [
+      "low plastic stool",
+      5,
+      null
+    ],
+    [
+      "small plastic stool",
+      5,
+      null
+    ],
+    [
+      "blue plastic stool",
+      5,
+      null
+    ],
+    [
+      "red plastic stool",
+      5,
+      null
+    ],
+    [
+      "small red plastic stool",
+      5,
+      null
+    ],
+    [
+      "small blue plastic stool",
+      5,
+      null
+    ],
+    [
+      "round plastic stool",
+      5,
+      null
+    ],
+    [
+      "street food cart",
+      6,
+      null
+    ],
+    [
+      "wheeled food vending cart",
+      6,
+      null
+    ],
+    [
+      "mobile food vending cart",
+      6,
+      null
+    ],
+    [
+      "fruit food stand",
+      6,
+      null
+    ],
+    [
+      "shop sign",
+      7,
+      null
+    ],
+    [
+      "advertising signboard",
+      7,
+      null
+    ],
+    [
+      "hanging sign",
+      7,
+      null
+    ],
+    [
+      "store signboard",
+      7,
+      null
+    ],
+    [
+      "utility pole",
+      8,
+      null
+    ],
+    [
+      "electric pole",
+      8,
+      null
+    ],
+    [
+      "tree trunk",
+      9,
+      null
+    ],
+    [
+      "tree stem",
+      9,
+      null
+    ],
+    [
+      "basket of fruit",
+      10,
+      null
+    ],
+    [
+      "crate of vegetables",
+      10,
+      null
+    ],
+    [
+      "packaged products",
+      10,
+      null
+    ],
+    [
+      "fruit crate",
+      10,
+      null
+    ],
+    [
+      "stacked packaged goods",
+      10,
+      null
+    ],
+    [
+      "folding gate",
+      null,
+      "barrier_gate"
+    ],
+    [
+      "metal gate",
+      null,
+      "barrier_gate"
+    ],
+    [
+      "security gate",
+      null,
+      "barrier_gate"
+    ],
+    [
+      "iron fence",
+      null,
+      "fence"
+    ],
+    [
+      "storefront canopy",
+      null,
+      "canopy"
+    ],
+    [
+      "fabric awning",
+      null,
+      "canopy"
+    ],
+    [
+      "concrete wall",
+      null,
+      "wall"
+    ],
+    [
+      "building column",
+      null,
+      "column"
+    ],
+    [
+      "baby stroller",
+      null,
+      "stroller"
+    ],
+    [
+      "pushchair",
+      null,
+      "stroller"
+    ],
+    [
+      "bicycle",
+      null,
+      "bicycle"
+    ],
+    [
+      "truck",
+      null,
+      "car"
+    ],
+    [
+      "van",
+      null,
+      "car"
+    ],
+    [
+      "traffic sign",
+      null,
+      "traffic_sign"
+    ],
+    [
+      "barrier gate",
+      null,
+      "barrier_gate"
+    ],
+    [
+      "potted plant",
+      null,
+      "potted_plant"
+    ],
+    [
+      "pile of bricks",
+      null,
+      "construction_materials"
+    ],
+    [
+      "sand pile",
+      null,
+      "construction_materials"
+    ],
+    [
+      "styrofoam box",
+      null,
+      "foam_box"
+    ],
+    [
+      "paving slabs",
+      null,
+      "construction_materials"
+    ],
+    [
+      "concrete blocks",
+      null,
+      "construction_materials"
+    ],
+    [
+      "construction debris",
+      null,
+      "construction_materials"
+    ],
+    [
+      "pedal bicycle",
+      null,
+      "bicycle"
+    ],
+    [
+      "metal folding chair",
+      null,
+      "nonplastic_chair"
+    ],
+    [
+      "metal table",
+      null,
+      "nonplastic_table"
+    ]
+  ],
+  "original_export": {
+    "checkpoint": "C:\\Users\\doanq\\Downloads\\UAV-yoloe-v8-s\\UAV\\lan_chiem\\models\\yoloe-v8s-single.pt",
+    "sha256": "06bb25a39531f41f7b1e2969b027e1b089d0b01420b5f943f6e30401d1288535",
+    "fine_tuned": false,
+    "source": {
+      "model_id": "yoloe-v8s-seg.pt",
+      "model_revision": "ac2b90ed23011495a3e86d89caeb3432a15129cac8d849ba121293c8fc1e0536",
+      "catalog_version": "objects-v3-10",
+      "backend": "yoloe",
+      "task": "detect",
+      "imgsz": 960,
+      "precision": "fp16",
+      "vocabulary_sha256": "85cec415ca14880e9ec4697192830d40fbd81895fc95349c261e60acef3b7f8d",
+      "reparameterized": true,
+      "trunk_refiner": null,
+      "detector_count": 1,
+      "text_embeddings": {
+        "status": "hit",
+        "key": "fc2f7769e4be32918d847968567d1043211a4d9c4f022b42b9442010eecdc5a5",
+        "path": "C:\\Users\\doanq\\Downloads\\UAV-yoloe-v8-s\\UAV\\lan_chiem\\outputs\\text_embeddings\\fc2f7769e4be32918d847968567d1043211a4d9c4f022b42b9442010eecdc5a5.npz"
+      },
+      "versions": {
+        "torch": "2.11.0+cu128",
+        "ultralytics": "8.4.45",
+        "torchvision": "0.26.0+cu128"
+      }
+    }
+  },
+  "master_checkpoint": "yoloe_training_standalone/runs/candidate_balanced.pt"
+}

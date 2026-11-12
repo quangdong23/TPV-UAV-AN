@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uav-analysis"
+version = "1.0.0"
+description = "Unified UAV sidewalk, object, tracking and event analysis"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[project.scripts]
+uav = "uav_pipeline.cli.main:main"
+
+[project.optional-dependencies]
+gis = ["rasterio>=1.3.0", "pyproj>=3.6.0"]
+evaluation = ["trackeval==1.3.0", "pycocotools>=2.0.7"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["uav_pipeline*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

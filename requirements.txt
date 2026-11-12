@@ -1,0 +1,12 @@
+# Shared inference runtime. Keep the server CUDA-enabled PyTorch installation.
+torch
+torchvision
+ultralytics==8.4.45
+transformers==4.57.6
+Pillow>=10.0.0
+numpy>=1.24.0,<3
+PyYAML>=6.0
+opencv-python-headless>=4.8.0,<6
+scipy>=1.11.0,<2
+shapely>=2.0.0
+safetensors>=0.4.0

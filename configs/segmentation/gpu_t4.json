@@ -1,0 +1,69 @@
+{
+  "models": [
+    {
+      "name": "mask2former_mapillary",
+      "model_id": "facebook/mask2former-swin-large-mapillary-vistas-semantic",
+      "backend": "mask2former",
+      "taxonomy": "mapillary_vistas",
+      "weight": 1.0,
+      "enabled": true
+    }
+  ],
+  "tiling": {
+    "tile_size": 768,
+    "overlap": 0.1,
+    "weight_floor": 0.05,
+    "max_image_side": 768,
+    "strategy": "whole",
+    "whole_image_max_pixels": 1048576
+  },
+  "preprocessing": {
+    "low_light_mode": "disabled",
+    "low_light_threshold": 0.28,
+    "clahe_clip_limit": 1.5,
+    "clahe_grid_size": 8
+  },
+  "decision": {
+    "min_confidence": 0.55,
+    "min_margin": 0.12,
+    "max_normalized_entropy": 0.85,
+    "unknown_id": 255
+  },
+  "polygon": {
+    "min_area_pixels": 500.0,
+    "min_hole_area_pixels": 100.0,
+    "min_area_ratio": 0.002,
+    "min_hole_area_ratio": 0.0015,
+    "simplify_epsilon_ratio": 0.004,
+    "close_kernel_size": 0,
+    "draw_vertices": true,
+    "draw_hole_vertices": false
+  },
+  "completion": {
+    "enabled": true,
+    "min_component_area_ratio": 0.0005,
+    "min_component_relative_area": 0.1,
+    "min_component_aspect_ratio": 4.5,
+    "closing_kernel_ratio": 0.08,
+    "max_closing_kernel_size": 121,
+    "fill_holes": true,
+    "max_hole_area_ratio": 1.0,
+    "unknown_expansion_ratio": 0.0,
+    "max_closing_growth_ratio": 1.5,
+    "envelope_enabled": true,
+    "concave_hull_ratio": 0.4,
+    "max_envelope_growth_ratio": 1.8
+  },
+  "output": {
+    "save_scores": false,
+    "overlay_alpha": 0.45,
+    "show_unknown": false,
+    "target_crs": null,
+    "png_compress_level": 1
+  },
+  "device": "cuda",
+  "precision": "fp16",
+  "cpu_threads": 0,
+  "cpu_attention": "sdpa",
+  "cache_dir": ".cache/huggingface"
+}

@@ -1,11 +1,9 @@
-# Python environments and bytecode
-.venv/
+﻿.venv/
 __pycache__/
 *.py[cod]
-
-# Generated model results and local caches
+.cache/
 outputs/
-.hf_cache/
-
-# Editor-specific local settings
+build/
+dist/
+*.egg-info/
 .vscode/

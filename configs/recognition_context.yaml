@@ -1,0 +1,194 @@
+schema_version: 1
+profile_name: vietnam_urban_uav_four_difficult_classes
+semantic_mode: fixed_vocabulary_runtime_rules_and_offline_annotation_guidance
+notes:
+  - Checkpoint production đã fuse 63 prompt. Mô tả dưới đây không thay embedding hoặc tự huấn luyện model.
+  - Runtime chỉ dùng runtime_policy. positive_prompts và hard_negative_prompts dành cho teacher mở từ vựng và người gán nhãn offline.
+  - Không suy ra vật thể từ một dấu hiệu như màu, lá xanh, chữ viết hoặc hình hộp. Không lấy nhãn teacher làm GT chưa kiểm tra.
+runtime_policy:
+  enabled: true
+  geometry_requires_competing_evidence: true
+  green_background_is_not_negative_evidence: true
+  pole_tree_same_object_only: true
+  competing_score_margin: 0.05
+  competing_iou: 0.60
+  competing_mutual_coverage: 0.70
+  known_watermark_regions: []
+  watermark_min_box_coverage: 0.90
+classes:
+  7:
+    name_vi: Biển quảng cáo / biển hiệu
+    definition: Mặt biển truyền đạt thông tin cửa hàng, sản phẩm hoặc dịch vụ; nhận diện mặt biển, không gộp toàn bộ cửa hàng, mái che hay cột đỡ.
+    variants:
+      - Biển chữ nhật ngang hoặc đứng bằng bạt, tôn, nhôm composite, mica, gỗ hoặc bảng điện tử.
+      - Biển hộp đèn sáng hoặc không sáng, biển cũ phai màu, biển bị phản sáng hoặc bám bụi.
+      - Biển đứng chữ A, bảng thực đơn, bảng giá, standee và bảng nhỏ tựa tường trước cửa hàng.
+      - Biển vẫy vuông hoặc tròn gắn vuông góc mặt tiền; biển treo ngang trên cành cây hoặc cột.
+      - Băng quảng cáo dạng dọc/hẹp, biển bị nghiêng phối cảnh, chỉ thấy mặt cạnh hoặc bị lá/cáp che một phần.
+      - Biển không đọc được chữ vì nhỏ hoặc mờ; logo, hình sản phẩm và bố cục mặt biển vẫn có thể là gợi ý.
+    supporting_cues:
+      - Mặt phẳng có ranh giới hoặc khung; bố cục chữ/logo/hình ảnh đi cùng ngữ cảnh cơ sở kinh doanh.
+      - Có thể đứng ở đất, treo cao hoặc gắn mặt tiền; quan hệ này không tự xác nhận vi phạm.
+    common_confusions:
+      - Biển giao thông, biển tên đường, biển số nhà; không đồng nhất mọi hình có chữ với quảng cáo.
+      - Mái hiên, bạt che nắng, cửa cuốn, cửa sổ, poster trên xe và các mảng tường có họa tiết.
+      - Watermark/timestamp phủ lên video; vị trí gần đáy ảnh không đủ để kết luận watermark.
+    positive_prompts:
+      - advertising signboard outside a shop
+      - small rectangular shop sign attached to a utility pole
+      - advertising board hanging from a tree trunk
+      - freestanding A-frame advertising sign on a sidewalk
+      - narrow vertical shop advertising banner
+      - wall-mounted shop sign viewed obliquely
+      - round illuminated shop sign projecting from a facade
+      - faded shop advertising sign partly occluded by foliage
+      - outdoor menu board in front of a food stall
+      - rectangular shop lightbox sign
+      - tilted advertising sign leaning against a shop wall
+      - commercial signboard with unreadable small lettering
+    hard_negative_prompts:
+      - road traffic sign
+      - street name sign
+      - house number plate
+      - fabric awning above a storefront
+      - corrugated metal shop canopy
+      - roller shutter with painted lettering
+      - video timestamp overlay
+      - video watermark logo
+    annotation_rules:
+      - Box ôm mặt biển nhìn thấy; không gộp toàn bộ cột, thân cây, người hoặc mặt tiền.
+      - Gán riêng biển và vật đỡ khi cả hai có phần nhìn thấy; giữ các box khác class chồng lấp hợp lý.
+      - Không ép biển giao thông/tên đường thành biển quảng cáo; trường hợp chưa rõ cần review.
+      - Không loại biển thật chỉ vì nó nằm ở góc/đáy frame. Watermark phải có bằng chứng overlay hoặc vùng được xác định trước.
+  8:
+    name_vi: Cột điện
+    definition: Thân cột hạ tầng điện/viễn thông nhìn thấy; phân biệt với cột nhà, cột biển, thân cây và các đường thẳng trong nền.
+    variants:
+      - Cột bê tông ly tâm tròn, cột bê tông vuông, cột thép hoặc kim loại sơn, cột gỗ mang hạ tầng điện nếu thuộc quy ước dữ liệu.
+      - Cột xám, nâu, đen hoặc sơn trắng; cột dán quảng cáo, có vệt bẩn, vết nứt hoặc bị dây leo che.
+      - Cột có dây cáp chằng chịt, hộp điện, đồng hồ, sứ cách điện, thanh ngang hoặc đèn; các bộ phận này có thể khuất hoặc ở ngoài frame.
+      - Cột dựa sát mặt tiền, nằm giữa nhiều thân cây, phía trên có tán cây; cột có phần chân bị xe/người/hàng hóa che.
+      - Cột nhìn xiên, nghiêng do phối cảnh UAV, bị cắt đầu/chân ảnh, chỉ thấy một đoạn thân hoặc có box rộng khi camera zoom.
+    supporting_cues:
+      - Thân tương đối đều hoặc thuôn, liên kết với dây/phụ kiện hạ tầng nếu nhìn thấy.
+      - Dây có thể đi qua gần cây hoặc cột nhà; một sợi dây trong box không đủ xác nhận cột điện.
+    common_confusions:
+      - Thân cây sơn vôi trắng, thân cây trụi lá, cành lớn và cây có vỏ xám.
+      - Cột nhà, trụ cổng, cạnh tường, ống thoát nước, thanh khung mái, cột biển báo hoặc cọc hàng rào.
+      - Nền xanh/tán cây phía trên cột thật không chứng minh đó là thân cây.
+    positive_prompts:
+      - concrete utility pole carrying overhead electrical cables
+      - cylindrical concrete power pole beside a sidewalk
+      - square concrete electricity pole
+      - metal utility pole with attached cable junction boxes
+      - wooden utility pole supporting power lines
+      - utility pole partly hidden behind tree foliage
+      - utility pole beside a building facade
+      - leaning power pole viewed obliquely from a drone
+      - utility pole with tangled telecommunications cables
+      - partially visible utility pole with occluded base
+      - utility pole covered with paper advertisements
+      - power pole with insulators and crossarm
+    hard_negative_prompts:
+      - whitewashed tree trunk
+      - grey bark tree trunk
+      - concrete building column
+      - rectangular gate post
+      - vertical rainwater drain pipe
+      - traffic sign support post
+      - metal fence post
+      - vertical edge of a concrete wall
+    annotation_rules:
+      - Nhãn thân cột nhìn thấy theo cùng một quy ước; không kéo box ra toàn bộ bó dây hoặc vùng tán lá.
+      - Giữ cột thật dưới tán cây và cột không thấy dây trong crop; ghi mức che khuất thay vì coi thiếu phụ kiện là phủ định.
+      - Không dùng ngưỡng rộng 55 pixel như tiêu chuẩn vật lý cố định ở mọi độ phân giải và góc nhìn.
+      - Cột đèn độc lập/cột tín hiệu cần quy ước dataset rõ; không tự đổi class từ mô tả này.
+  9:
+    name_vi: Thân cây
+    definition: Phần thân gỗ nhìn thấy từ gốc/đoạn thân đến chỗ phân cành; không đồng nhất box toàn tán cây với thân cây.
+    variants:
+      - Thân thẳng, nghiêng, cong, chẻ nhánh, nhiều thân chung gốc, thân nhỏ hoặc thân rất to.
+      - Vỏ cây xám, nâu, trắng, trơn hoặc nứt; gốc sơn vôi trắng, thân có rêu, dây leo, đinh hoặc biển gắn.
+      - Cây trụi lá/cắt tỉa mạnh, thân cọ hoặc cau, thân cây chỉ thấy đoạn giữa vì chân/đầu bị che.
+      - Thân sát tường, giữa dây điện, sau xe đỗ hoặc quầy hàng; thân rơi vào bóng tối hoặc phản sáng.
+      - Thân cây bị nghiêng mạnh trong ảnh UAV, nhìn xiên từ trên cao; không bắt buộc box luôn cao hơn rộng.
+    supporting_cues:
+      - Dạng thân phân cành, thuôn hoặc có kết cấu vỏ/gốc khi đủ độ phân giải.
+      - Có lá phía trên là ngữ cảnh hỗ trợ, không phải điều kiện bắt buộc và không xác nhận mọi trụ bên dưới là cây.
+    common_confusions:
+      - Cột điện bê tông, cột gỗ hạ tầng, cột nhà, cột đỡ mái và ống nước.
+      - Tán lá/bụi cây, cây cảnh nhỏ trong chậu, bồn cây, bóng cây hoặc vệt sơn trên tường.
+      - Box toàn cây gồm nhiều tán hoặc cả hàng cây; không coi đó là một thân cây đơn lẻ.
+    positive_prompts:
+      - exposed tree trunk beside an urban sidewalk
+      - whitewashed lower tree trunk
+      - grey bark tree trunk near a concrete wall
+      - leaning tree trunk seen from an oblique drone view
+      - partially occluded tree trunk behind parked motorcycles
+      - pruned leafless street tree trunk
+      - curved tree trunk with branching stem
+      - palm tree trunk along a street
+      - thick mature tree trunk with exposed roots
+      - thin street tree trunk partly hidden by a sign
+      - dark tree trunk in shadow
+      - multiple distinct tree trunks growing beside a shop
+    hard_negative_prompts:
+      - concrete utility pole
+      - wooden power pole with cables
+      - building support column
+      - vertical drain pipe
+      - dense tree canopy without visible trunk
+      - potted shrub
+      - tree shadow on pavement
+      - painted vertical stripe on a wall
+    annotation_rules:
+      - Box thân nhìn thấy, không kéo lên toàn tán và không đổi quy ước giữa ảnh train/val/test.
+      - Gán riêng các thân có thể phân biệt; nhiều thân chưa phân biệt được cần review thay vì nhân box tùy ý.
+      - Phần sơn vôi vẫn là thân cây; thiếu lá hoặc thiếu gốc trong ảnh không tự loại nhãn.
+      - Không gán đồng thời cột điện và cây cho cùng một thân nếu không có bằng chứng hai vật thể riêng.
+  10:
+    name_vi: Hàng hóa trưng bày
+    definition: Sản phẩm hoặc cụm hàng nhìn thấy được trưng bày/xếp chờ bán; phân biệt nội dung hàng với vật chứa rỗng và dụng cụ bán hàng.
+    variants:
+      - Rau, củ, quả trong sọt nhựa, giỏ, khay, thùng xốp hoặc đặt trên bạt/sạp thấp.
+      - Hàng đóng gói, túi bao sản phẩm, thùng carton có hàng, chai/lon, nước uống hoặc đồ gia dụng nhỏ.
+      - Quần áo, giày dép, túi xách, đồ chơi hoặc phụ kiện bày trên giá, bàn, tấm bạt hay phía trước cửa hàng.
+      - Cụm hàng nhiều màu, bao bì đồng màu, thùng xếp chồng, hàng bị bạt che một phần hoặc chỉ thấy mặt trên từ UAV.
+      - Hàng trên xe đẩy, trên bàn, sát người bán hoặc giữa nhiều vật khác; có thể chồng box với bàn/xe đẩy/người một phần.
+      - Hàng nhỏ, lặp nhiều món, bị che bởi mái hiên, bóng tối hoặc vật chứa; cần context rộng hơn một mảng texture.
+    supporting_cues:
+      - Nội dung sản phẩm, cách xếp/trưng bày và ngữ cảnh cửa hàng/quầy là các gợi ý bổ sung khi nhìn thấy.
+      - Không có người bán không chứng minh không phải hàng hóa; gần cửa hàng cũng không tự biến vật bất kỳ thành hàng hóa.
+    common_confusions:
+      - Sọt, thùng xốp, carton, khay hoặc pallet rỗng; thùng rác và túi rác.
+      - Chậu cây/bụi cây, gạch, cát, đá, phế thải xây dựng, xe và các họa tiết nền.
+      - Bàn, ghế, xe đẩy hoặc mái che nguyên khối; đó có thể là vật đỡ, không phải nội dung hàng.
+      - Vật liệu xây dựng đang bày bán cần quy ước riêng; không tự coi mọi đống gạch là hàng hóa hoặc mọi gạch là phế thải.
+    positive_prompts:
+      - baskets of fruit displayed for sale on a sidewalk
+      - crates of fresh vegetables at a street stall
+      - visible produce inside open foam boxes
+      - packaged merchandise stacked outside a shop
+      - bottled drinks displayed in front of a store
+      - bags of packaged products on a low sidewalk display
+      - shoes arranged for sale on a pavement mat
+      - clothing displayed on an outdoor rack
+      - small household products displayed on a street vendor table
+      - cartons containing visible retail products
+      - goods displayed on a mobile vending cart
+      - partially covered merchandise at an outdoor stall
+    hard_negative_prompts:
+      - empty plastic basket
+      - empty foam storage box
+      - empty cardboard carton
+      - garbage bin and refuse bags
+      - potted ornamental plant
+      - construction rubble and broken bricks
+      - sand pile beside a construction site
+      - empty vendor table
+      - folded fabric awning
+    annotation_rules:
+      - Gán box nội dung hàng/cụm hàng theo quy ước nhất quán; không gộp toàn bộ bàn, xe đẩy, người bán hoặc mái che.
+      - Vật chứa có hàng nhìn thấy khác với vật chứa rỗng; không khẳng định nội dung bên trong thùng kín từ hình dạng alone.
+      - Không loại hàng chỉ vì nằm trên bàn/ghế/xe; giữ quan hệ vật đỡ để review.
+      - Gán đủ các class khác hiện diện trong ảnh, không chỉ bốn class đang ưu tiên; giữ toàn bộ một chuyến bay trong cùng split.
