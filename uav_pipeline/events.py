@@ -26,12 +26,13 @@ class EventOptions:
     attachment_gap_ratio: float = .15
     attachment_relative_tolerance: float = .2
     attachment_camera_motion_ratio: float = .01
+    activity_frames: int = 5
     repair_seconds: float = 2.
     repair_gap_ratio: float = .25
     repair_stationary_ratio: float = .2
 
     def validate(self):
-        for name in ('encroachment_frames', 'attachment_frames', 'min_detector_observations'):
+        for name in ('encroachment_frames', 'attachment_frames', 'min_detector_observations', 'activity_frames'):
             if not isinstance(getattr(self, name), int) or getattr(self, name) < 1:
                 raise ValueError(f'{name} must be a positive integer')
         if not isinstance(self.contact_margin_pixels, int) or self.contact_margin_pixels < 0:
@@ -78,7 +79,9 @@ def attachment_candidates(sign, supports, gap_limit):
 
 
 class ViolationMonitor:
-    def __init__(self, options=None):
+    def __init__(self, options=None, activity_classifier=None):
+        self.activity_classifier = activity_classifier
+        self.activity_frame = None
         self.options = options or EventOptions()
         self.options.validate()
         self.presence, self.pairs, self.last_alert = {}, {}, {}
@@ -101,11 +104,12 @@ class ViolationMonitor:
             state['detector_frames'].add(index)
         return state
 
-    def _emit(self, kind, key, state, index, timestamp, tracks, extra=None):
+    def _emit(self, kind, key, state, index, timestamp, tracks, extra=None, min_observations=None):
         options = self.options
         if state['alerted'] or timestamp-self.last_alert.get((kind,key), -1e9) < options.cooldown_seconds:
             return None
-        if len(state['detector_frames']) < options.min_detector_observations:
+        required = options.min_detector_observations if min_observations is None else min_observations
+        if len(state['detector_frames']) < required:
             return None
         state['alerted'] = True
         self.last_alert[(kind,key)] = timestamp
@@ -122,12 +126,13 @@ class ViolationMonitor:
         event['evidence']['confirmation_boxes_source_pixels'] = [
             {'track_id':t['track_id'],'class_id':t['class_id'],
              'bbox_xyxy':(np.asarray(t['bbox_xyxy'])*self.source_factor).tolist()} for t in tracks]
-        if kind != 'motorcycle_repair_suspected':
+        if kind not in ('motorcycle_repair_suspected', 'vehicle_repair_suspected', 'vehicle_washing_suspected'):
             self.confirmed_track_ids.update(event['track_ids'])
         self.events.append(event)
         return event
 
-    def update(self, index, timestamp, observations, mask, motion, source_size=None):
+    def update(self, index, timestamp, observations, mask, motion, source_size=None, frame=None):
+        self.activity_frame = frame
         h,w=mask.shape
         sw,sh=source_size or (w,h)
         self.source_factor=np.array([sw/w,sh/h,sw/w,sh/h])
@@ -215,7 +220,8 @@ class ViolationMonitor:
         o = self.options
         people = [t for t in observations if t['class_id'] == ClassId.PERSON
                   and on_sidewalk(t['bbox_xyxy'], mask, o.contact_margin_pixels)]
-        bikes = [t for t in observations if t['class_id'] == ClassId.MOTORCYCLE
+        vehicle_classes = (ClassId.MOTORCYCLE, ClassId.CAR) if self.activity_classifier else (ClassId.MOTORCYCLE,)
+        bikes = [t for t in observations if t['class_id'] in vehicle_classes
                  and on_sidewalk(t['bbox_xyxy'], mask, o.contact_margin_pixels)]
         active, created = set(), []
         for person in people:
@@ -245,22 +251,58 @@ class ViolationMonitor:
                 state['last_timestamp'] = timestamp
                 active.add(key)
                 duration = timestamp-state['first_timestamp']
-                if (duration + 1e-9 < o.repair_seconds
+                box = np.concatenate((np.minimum(a[:2], b[:2]), np.maximum(a[2:], b[2:])))
+                evidence = {'duration_seconds': duration, 'stationary_frames': state['count'],
+                            'normalized_box_gap': float(np.linalg.norm(gap)/scale),
+                            'combined_bbox_source_pixels': (box*self.source_factor).tolist(),
+                            'interpretation': 'stationary_sidewalk_proximity_not_proof_of_repair'}
+                kind, label = 'motorcycle_repair_suspected', 'Nghi sửa xe'
+                if self.activity_classifier is not None:
+                    from uav_pipeline.detection.activity import activity_crop_box
+                    crop_box = activity_crop_box(box, mask.shape)
+                    ready = state['count'] >= o.activity_frames
+                    # Phân loại ngay frame thứ 5, sau đó mỗi 5 frame; không chờ xác nhận track.
+                    if ready and (state['count']-o.activity_frames) % o.activity_frames == 0:
+                        state['classification'] = (self.activity_classifier.predict(self.activity_frame, box)
+                                                   if self.activity_frame is not None else None)
+                    result = state.get('classification')
+                    accepted = (ready and result is not None and result['label'] in
+                                ('repairing_vehicle', 'washing_vehicle')
+                                and result['confidence'] >= .75 and result['margin'] >= .2)
+                    names = {'repairing_vehicle': 'Sửa xe', 'washing_vehicle': 'Rửa xe',
+                             'other_activity': 'Hoạt động khác', 'street_vending': 'Bán hàng'}
+                    label = (f"{names[result['label']]} {result['confidence']:.0%}" if result else
+                             ('Crop quá nhỏ' if ready else 'Chờ ổn định'))
+                    kind = ('vehicle_repair_suspected' if result and result['label'] == 'repairing_vehicle'
+                            else 'vehicle_washing_suspected') if accepted else 'activity_candidate'
+                    self.repair_regions.append({'kind': kind, 'label': label,
+                        'requires_review': True, 'track_ids': list(key),
+                        'bbox_xyxy': crop_box, 'person_bbox_xyxy': a.tolist(),
+                        'vehicle_bbox_xyxy': b.tolist(), 'stationary_frames': state['count'],
+                        'ready': ready, 'classification': result, 'duration_seconds': duration})
+                    if not accepted:
+                        continue
+                    evidence.update({'interpretation': 'mobilenetv3_with_five_frame_geometry_requires_review',
+                                     'classification': dict(result)})
+                    evidence['classification']['crop_bbox_xyxy'] = (
+                        np.asarray(result['crop_bbox_xyxy'])*self.source_factor).tolist()
+                elif (duration + 1e-9 < o.repair_seconds
                         or not all(t.get('track_confirmed', True) for t in (person, bike))
                         or len(state['detector_frames']) < o.min_detector_observations):
                     continue
-                box = np.concatenate((np.minimum(a[:2], b[:2]), np.maximum(a[2:], b[2:])))
-                evidence = {'duration_seconds': duration, 'normalized_box_gap': float(np.linalg.norm(gap)/scale),
-                            'combined_bbox_source_pixels': (box*self.source_factor).tolist(),
-                            'interpretation': 'stationary_sidewalk_proximity_not_proof_of_repair'}
-                event = self._emit('motorcycle_repair_suspected', key, state, index, timestamp,
-                                   [person, bike], evidence)
+                if self.activity_classifier is not None:
+                    # Mỗi loại hành động có trạng thái cảnh báo riêng trên cùng cặp người–xe.
+                    state['alerted'] = kind in state.setdefault('alerted_kinds', set())
+                event = self._emit(kind, key, state, index, timestamp, [person, bike], evidence,
+                                   min_observations=0 if self.activity_classifier is not None else None)
                 if event:
                     created.append(event)
+                    if self.activity_classifier is not None:
+                        state['alerted_kinds'].add(kind)
                 # Cooldown suppresses duplicate events, not a currently valid box.
-                self.repair_regions.append({'kind': 'motorcycle_repair_suspected',
-                    'label': 'Nghi sửa xe', 'requires_review': True,
-                    'track_ids': list(key), 'bbox_xyxy': box.tolist(), 'duration_seconds': duration})
+                if self.activity_classifier is None:
+                    self.repair_regions.append({'kind': kind, 'label': label, 'requires_review': True,
+                        'track_ids': list(key), 'bbox_xyxy': box.tolist(), 'duration_seconds': duration})
         self.repairs = {k:v for k,v in self.repairs.items() if k in active}
         return created
 
@@ -276,9 +318,17 @@ class ViolationMonitor:
                         cv2.FONT_HERSHEY_SIMPLEX,.65,(0,0,255),2)
         for region in self.repair_regions:
             from uav_pipeline.video.pipeline import _put_label
+            color = (0,0,255) if region['kind'] != 'activity_candidate' else (0,200,255)
+            for name, shade in (('person_bbox_xyxy', (255,200,0)), ('vehicle_bbox_xyxy', (0,220,0))):
+                if name in region:
+                    inner = np.rint(region[name]).astype(int)
+                    cv2.rectangle(image, tuple(inner[:2]), tuple(inner[2:]), shade, 2)
             box = np.rint(region['bbox_xyxy']).astype(int)
-            cv2.rectangle(image, tuple(box[:2]), tuple(box[2:]), (0,0,255), 3)
-            _put_label(image, region['label'], int(box[0]), max(0, int(box[1])-22), (0,0,255))
+            cv2.rectangle(image, tuple(box[:2]), tuple(box[2:]), color, 3)
+            label = region['label']
+            if 'stationary_frames' in region:
+                label = f"Crop {region['track_ids']} {min(region['stationary_frames'], self.options.activity_frames)}/{self.options.activity_frames}: {label}"
+            _put_label(image, label, int(box[0]), max(0, int(box[1])-22), color)
         return image
 
     def export(self, output, fps, frames, video_available=True):
@@ -316,7 +366,8 @@ class ViolationMonitor:
         report={'options':asdict(self.options),'alert_count':len(self.events),
                 'counts_by_kind':{kind:sum(e['kind']==kind for e in self.events)
                                   for kind in ('sidewalk_encroachment','sign_attachment_suspected',
-                                               'motorcycle_repair_suspected')},
+                                               'motorcycle_repair_suspected', 'vehicle_repair_suspected',
+                                               'vehicle_washing_suspected')},
                 'unique_clips':len(clips)-len(failures),'clip_errors':errors,
                 'requires_human_review':True,'events':self.events}
         atomic_json(output/'events.json',report)
