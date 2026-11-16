@@ -36,6 +36,7 @@ def main():
             'test_video_outputs',
             'test_motion_inputs',
             'test_events',
+            'test_activity',
             'test_segmentation_parity',
         ])
     if args.evaluation:

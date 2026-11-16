@@ -118,3 +118,30 @@ Khi chạy với cờ `--events`, hệ thống tự động sinh:
 1. **Video trực quan hóa**: Vẽ ranh giới phân định vỉa hè, hộp bao nhận diện vật thể và nhãn cảnh báo vi phạm màu đỏ.
 2. **`events.jsonl`**: Ghi lại từng sự kiện lấn chiếm (thời điểm bắt đầu, kết thúc, loại vi phạm, tọa độ, thời lượng).
 3. **Thư mục `evidence_clips/`**: Cắt ngắn các đoạn video vi phạm (khoảng 14 giây gồm 4s trước và 10s sau khi vi phạm) để báo cáo cơ quan chức năng.
+
+## Phân loại sửa xe / rửa xe
+
+Khi bật `--events`, hệ thống dùng MobileNetV3 Small từ `models/mobilenetv3_activity.pt`.
+YOLOE tìm người gần xe máy/ô tô trên vỉa hè; crop gộp được thêm lề 10%, giữ tỉ lệ và đệm về 224×224 đúng cách train.
+Người–xe gần nhau và tương đối đứng yên đủ 5 frame liên tiếp thì phân loại ngay, sau đó cập nhật mỗi 5 frame; không chờ track xác nhận hoặc 3 lượt phân loại. Cảnh báo sửa/rửa xe khi xác suất ≥ 0,75 và chênh lệch hai lớp đầu ≥ 0,20. Đổi số frame bằng `--activity-frames` (mặc định 5). Bbox người màu xanh lam, xe màu xanh lá, crop gộp có lề 10% màu vàng; crop đạt ngưỡng cảnh báo màu đỏ. Nhãn crop hiển thị bộ đếm ổn định, lớp và xác suất kể cả khi model trả về hoạt động khác.
+Các ngưỡng là heuristic ban đầu, cần kiểm tra trên video UAV thực tế.
+Kết quả gồm nhãn trên video, `activity_regions` trong JSONL và sự kiện `vehicle_repair_suspected` / `vehicle_washing_suspected` kèm clip bằng chứng.
+
+```bash
+python -m uav_pipeline run --input data/samples/1.mp4 --events --device cuda
+# Đổi checkpoint bằng --activity-weights; dùng --no-activity để trở về heuristic cũ.
+python -m unittest tests.test_activity tests.test_events
+```
+
+Bản triển khai server nằm riêng tại `/home/abc/yuu_workspace/TPV-UAV-AN-activity`, môi trường `.venv` được tạo bằng `uv`.
+
+```bash
+cd /home/abc/yuu_workspace/TPV-UAV-AN-activity
+.venv/bin/python -m uav_pipeline run --input /đường/dẫn/video.mp4 --events --device cuda
+```
+
+Checkpoint `aug160_01` dùng đầu vào 160×160; bộ phân loại tự đọc kích thước từ metadata checkpoint sau bước letterbox 224×224. Chạy thử bằng:
+
+```bash
+python -m uav_pipeline run --input /đường/dẫn/video.mp4 --events --device cuda --activity-weights models/mobilenetv3_aug160_01.pt
+```

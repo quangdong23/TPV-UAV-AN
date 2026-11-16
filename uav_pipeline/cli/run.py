@@ -40,13 +40,21 @@ def run(argv=None):
                         help='Enable encroachment, sign attachment and suspected repair alerts with evidence clips')
     parser.add_argument('--violation-frames',type=int,default=10)
     parser.add_argument('--attachment-frames',type=int,default=10)
+    parser.add_argument('--activity-frames', type=int, default=5,
+                        help='Số frame liên tiếp người–xe gần và đứng yên trước khi phân loại')
     parser.add_argument('--repair-seconds', type=float, default=2.,
                         help='Stationary person/motorcycle proximity duration on sidewalk; requires --events')
+    parser.add_argument('--activity', action=argparse.BooleanOptionalAction, default=True,
+                        help='Phân loại sửa/rửa xe bằng MobileNetV3 khi bật --events')
+    parser.add_argument('--activity-weights', type=Path, default=root/'models/mobilenetv3_activity.pt',
+                        help='Checkpoint MobileNetV3 Small đã tinh chỉnh')
     args = parser.parse_args(argv)
     if args.sample_step is None:
         args.sample_step = 30 if args.output_mode == 'full' else 0
     if args.threads < 1 or args.max_frames < 0 or args.sample_step < 0 or args.sidewalk_keyframe_interval < 1:
         parser.error('Invalid threads/frame/sampling options')
+    if args.activity_frames < 1:
+        parser.error('--activity-frames phải >= 1')
     if args.violation_frames < 1 or args.attachment_frames < 1:
         parser.error('Event frame thresholds must be positive')
     if not math.isfinite(args.repair_seconds) or args.repair_seconds <= 0:
@@ -92,9 +100,13 @@ def run(argv=None):
     if options.frame_step != 1:
         parser.error('Combined mode requires frame_step=1 to process every source frame')
     detector = YOLOEDetector(weights=args.weights, device=args.device, config_path=args.object_config)
+    activity_classifier = None
+    if args.events and args.activity:
+        from uav_pipeline.detection.activity import ActivityClassifier
+        activity_classifier = ActivityClassifier(args.activity_weights, args.device)
     events=ViolationMonitor(EventOptions(encroachment_frames=args.violation_frames,
                            attachment_frames=args.attachment_frames,
-                           repair_seconds=args.repair_seconds)) if args.events else None
+                           repair_seconds=args.repair_seconds, activity_frames=args.activity_frames), activity_classifier=activity_classifier) if args.events else None
     with SidewalkPipeline(config) as pipeline:
         sidewalk_options = VideoPreviewOptions(keyframe_interval=args.sidewalk_keyframe_interval, cv_threads=options.cv_threads)
         session = SidewalkSession(pipeline, sidewalk_options, args.filter_mode, args.min_overlap, args.sample_step, crisp_overlay=True)

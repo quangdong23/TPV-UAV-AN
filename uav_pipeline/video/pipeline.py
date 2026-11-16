@@ -528,7 +528,7 @@ def process_video(source, output, detector, options=None, resume=False, max_fram
                 event_observations=sidewalk.filter(
                     tracker.event_observations(timestamp,frame.shape,movement), sidewalk_result)
                 new_events=events.update(index,timestamp,event_observations,sidewalk_result['mask'],movement,
-                                         source_size=[original_w,original_h])
+                                         source_size=[original_w,original_h], frame=frame)
                 timings['event_rules']+=time.perf_counter()-t
             t = time.perf_counter()
             if writer is None:
@@ -558,7 +558,11 @@ def process_video(source, output, detector, options=None, resume=False, max_fram
                 record['rule_alerts']=[{'event_id':e['event_id'],'kind':e['kind'],
                                        'requires_review':True} for e in new_events]
                 record['activity_regions'] = [
-                    {**region, 'bbox_xyxy': (np.asarray(region['bbox_xyxy'])*factor).tolist()}
+                    {**region, **{key: (np.asarray(region[key])*factor).tolist()
+                                 for key in ('bbox_xyxy', 'person_bbox_xyxy', 'vehicle_bbox_xyxy') if key in region},
+                     'classification': ({**region['classification'], 'crop_bbox_xyxy':
+                         (np.asarray(region['classification']['crop_bbox_xyxy'])*factor).tolist()}
+                         if region.get('classification') else None)}
                     for region in events.repair_regions]
             if sidewalk is not None:
                 sidewalk.save_samples(sidewalk_result, rendered, index, output, [original_w, original_h])
