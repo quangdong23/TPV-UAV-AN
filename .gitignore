@@ -16,6 +16,8 @@ dist/
 models/
 .tools/
 *.log
+*.pt
+*.json
 # Local live source credentials
 configs/rtmp_input.txt
 configs/rtmp_output.txt
