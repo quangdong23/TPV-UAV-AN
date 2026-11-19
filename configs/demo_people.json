@@ -1,0 +1,45 @@
+{
+  "note": "Dữ liệu giả phục vụ demo, không phải danh tính người trong ảnh.",
+  "people": [
+    {
+      "full_name": "Nguyễn Văn An",
+      "cccd": "000000000001"
+    },
+    {
+      "full_name": "Trần Thị Bình",
+      "cccd": "000000000002"
+    },
+    {
+      "full_name": "Lê Minh Châu",
+      "cccd": "000000000003"
+    },
+    {
+      "full_name": "Phạm Quốc Dũng",
+      "cccd": "000000000004"
+    },
+    {
+      "full_name": "Hoàng Thu Hà",
+      "cccd": "000000000005"
+    },
+    {
+      "full_name": "Vũ Đức Huy",
+      "cccd": "000000000006"
+    },
+    {
+      "full_name": "Đặng Ngọc Lan",
+      "cccd": "000000000007"
+    },
+    {
+      "full_name": "Bùi Anh Minh",
+      "cccd": "000000000008"
+    },
+    {
+      "full_name": "Đỗ Thị Ngọc",
+      "cccd": "000000000009"
+    },
+    {
+      "full_name": "Ngô Quang Phúc",
+      "cccd": "000000000010"
+    }
+  ]
+}

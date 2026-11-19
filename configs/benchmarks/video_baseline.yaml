@@ -1,0 +1,29 @@
+# Production schedule: ROI budget per keyframe; buffers in seconds.
+keyframe_interval: 5
+min_detection_interval: 3
+weak_track_fraction: 0.5
+frame_step: 1
+work_max_side: 0
+tracking_max_side: 480
+min_hits: 2
+max_lost_seconds: 1.0
+max_prediction_seconds: 0.4
+max_static_lost_seconds: 5.0
+max_static_prediction_seconds: 1.5
+segment_frames: 300
+precision: fp16
+log_interval: 3.0
+preview_interval: 0.0
+target_fps: 15.0
+cv_threads: 4
+warmup_runs: 3
+fast_render: true
+roi_detection_interval: 1
+async_encode: true
+flow_refresh_interval: 6
+roi_patch_budget: 2
+class_persistence_boost: true
+persistence_keyframes: 3
+persistence_missed_keyframes: 2
+
+track_full_frame: false

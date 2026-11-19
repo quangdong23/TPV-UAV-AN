@@ -1,0 +1,17 @@
+enabled: true
+weights: mobilenetv3_three_classes_tight_camera_20261116.pt
+metadata: mobilenetv3_three_classes_tight_camera_20261116.json
+confidence_threshold: 0.75
+min_margin: 0.2
+ema_alpha: 0.6
+sample_interval_seconds: 0.25
+max_evidence_age_seconds: 0.75
+confirmation_seconds: 1.0
+min_samples: 3
+min_detector_observations: 2
+pair_gap_ratio: 0.3
+crop_padding_ratio: 0.1
+max_crop_area_ratio: 0.65
+max_crops_per_batch: 8
+min_crop_side: 32
+max_sample_frame_interval: 5

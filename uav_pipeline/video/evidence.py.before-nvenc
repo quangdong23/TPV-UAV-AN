@@ -1,0 +1,207 @@
+"""Disk-backed live evidence and bounded recording retention."""
+from collections import Counter
+import json
+import math
+from pathlib import Path
+import threading
+
+from uav_pipeline.video.io import atomic_json, consolidate_recording, open_writer, write_frame
+
+
+class LiveEvidence:
+    def __init__(self, output, monitor, fps, uploader=None, retention_seconds=30,vfr=False):
+        self.output=Path(output)
+        self.monitor=monitor
+        self.fps=fps
+        self.vfr=vfr
+        self.retention_seconds=retention_seconds
+        self.segments=[]
+        self.buffer_writer=None
+        self.buffer_count=0
+        self.buffer_frames=0
+        self.buffer_part=0
+        self.buffer_timestamp=0.
+        (self.output/'evidence_buffer').mkdir(exist_ok=True)
+        self.counts=Counter()
+        self.upload_counts=Counter()
+        self.uploader=uploader
+        self.stop=threading.Event()
+        self.wake=threading.Event()
+        self.pending=self.output/'pending_uploads'
+        self.pending.mkdir(exist_ok=True)
+        self.worker=None
+        if uploader is not None:
+            self.worker=threading.Thread(target=self._uploads,daemon=True,name='live-evidence-upload')
+            self.worker.start()
+
+    def write(self, frame, timestamp):
+        """Small disk chunks used only for evidence; main recordings stay open."""
+        if self.monitor is None:return
+        if self.buffer_writer is None:
+            path=self.output/f'evidence_buffer/part_{self.buffer_part:06d}.mp4'
+            self.buffer_start_timestamp=timestamp
+            if self.vfr:
+                from uav_pipeline.video.vfr import VFRWriter
+                self.buffer_writer=VFRWriter(path,self.fps,frame.shape)
+            else:self.buffer_writer=open_writer(path,self.fps,frame.shape)
+        if self.vfr:self.buffer_writer.write_at(frame,timestamp)
+        else:write_frame(self.buffer_writer,frame)
+        self.buffer_count+=1
+        self.buffer_frames+=1
+        self.buffer_timestamp=timestamp
+        if (timestamp-self.buffer_start_timestamp>=2 if self.vfr else self.buffer_count>=max(1,math.ceil(self.fps*2))):
+            self._commit_buffer()
+
+    def _commit_buffer(self):
+        if self.buffer_writer is None:return
+        self.buffer_writer.release()
+        self.buffer_writer=None
+        self.segments.append({'video':f'evidence_buffer/part_{self.buffer_part:06d}.mp4',
+            'frames':self.buffer_count,'start_frame':self.buffer_frames-self.buffer_count,
+            'part':self.buffer_part,'start_timestamp':self.buffer_start_timestamp,
+            'end_timestamp':self.buffer_timestamp+1/self.fps})
+        self.buffer_part+=1
+        self.buffer_count=0
+        self.flush(self.segments,self.buffer_frames,self.buffer_timestamp)
+
+    def finish(self):
+        self._commit_buffer()
+        return self.flush(self.segments,self.buffer_frames,self.buffer_timestamp,final=True)
+
+    def _uploads(self):
+        while not self.stop.is_set():
+            # No executor queue or in-memory backlog: enumerate one durable job at a time.
+            for path in self.pending.iterdir():
+                if self.stop.is_set():break
+                if path.suffix!='.json':continue
+                try:
+                    event=json.loads(path.read_text())
+                    result=self.uploader.upload_events(self.output,[event])
+                    self.upload_counts.update(result)
+                    if not result['failed']:path.unlink()
+                except Exception:
+                    self.upload_counts['failed']+=1
+            self.wake.wait(5)
+            self.wake.clear()
+
+    def ready(self, frames):
+        """Finalize ready evidence without waiting for a long recording segment."""
+        if self.monitor is None:return False
+        options=self.monitor.options
+        if self.vfr:
+            return any(self.buffer_timestamp+1/self.fps>=min(
+                e['first_timestamp_seconds']+options.post_seconds,
+                max(0,e['first_timestamp_seconds']-options.pre_seconds)+options.max_clip_seconds)
+                for e in self.monitor.events)
+        limit=max(1,int(min(options.max_clip_seconds,
+                            options.pre_seconds+options.post_seconds)*self.fps))
+        for event in self.monitor.events:
+            first=max(0,math.floor(event['first_frame']-options.pre_seconds*self.fps))
+            end=min(math.ceil(event['first_frame']+options.post_seconds*self.fps),first+limit)
+            if frames>=end:return True
+        return False
+
+    def flush(self, segments, frames, timestamp, final=False):
+        monitor=self.monitor
+        scale=1. if self.vfr else self.fps
+        extent=timestamp+1/self.fps if self.vfr else frames
+        def start_of(segment):
+            return segment['start_timestamp'] if self.vfr else segment['start_frame']
+        def end_of(segment):
+            return segment['end_timestamp'] if self.vfr else segment['start_frame']+segment['frames']
+        if monitor is not None:
+            from uav_pipeline.uploads import behavior_name
+            groups=[]
+            limit=monitor.options.max_clip_seconds*scale
+            for event in sorted(monitor.events,key=lambda e:e['first_frame']):
+                anchor=event.get('first_timestamp_seconds',event['first_frame']/self.fps)*scale if self.vfr else event['first_frame']
+                first=max(0,anchor-monitor.options.pre_seconds*scale)
+                end=min(anchor+monitor.options.post_seconds*scale,first+limit)
+                group=next((g for g in reversed(groups) if first<g['last'] and
+                            max(end,g['last'])-g['first']<=limit),None)
+                if group is None:
+                    group={'first':first,'last':end,'events':[]};groups.append(group)
+                group['last']=max(group['last'],end);group['events'].append(event)
+            for group in groups:
+                first,end=group['first'],group['last'];members=group['events']
+                if not final and extent<end:continue
+                last=min(extent,end);event=members[0]
+                chosen=[s for s in segments if start_of(s)<last and end_of(s)>first]
+                alerts=[{'event_id':e['event_id'],'kind':e['kind'],'track_ids':e['track_ids'],
+                         'description':behavior_name(e)} for e in members]
+                clip={'status':'error','error':'Recording window unavailable'}
+                if chosen and start_of(chosen[0])<=first and last>first:
+                    staging=self.output/'clip_staging';staging.mkdir(exist_ok=True)
+                    (staging/'segments').mkdir(exist_ok=True)
+                    import os
+                    for segment in chosen:
+                        link=staging/'segments'/Path(segment['video']).name
+                        if not link.exists():os.link(self.output/segment['video'],link)
+                    try:
+                        consolidate_recording(staging,['segments/'+Path(s['video']).name for s in chosen],
+                                              'annotated.mp4',sum(s['frames'] for s in chosen),
+                                              start_timestamps=[s['start_timestamp'] for s in chosen] if self.vfr else None)
+                        target=self.output/'event_clips'/f"{event['event_id']}.mp4"
+                        target.parent.mkdir(exist_ok=True)
+                        if self.vfr:
+                            from uav_pipeline.video.vfr import cut_vfr
+                            cut_vfr(staging/'annotated.mp4',target,first-start_of(chosen[0]),last-start_of(chosen[0]))
+                        else:monitor._write_clip(staging/'annotated.mp4',target,
+                            int(first-start_of(chosen[0])),int(last-start_of(chosen[0])),self.fps)
+                        clip={'status':'saved','path':str(target.relative_to(self.output)),
+                              'start_output_seconds':first/scale,'end_output_seconds':last/scale,
+                              'timebase':'source_timestamps' if self.vfr else 'CFR_frames',
+                              'truncated_end':last<end,'truncated_start':first==0}
+                    except (OSError,RuntimeError) as error:
+                        clip={'status':'error','error':str(error)}
+                    finally:
+                        for path in (staging/'segments').iterdir():path.unlink()
+                        (staging/'annotated.mp4').unlink(missing_ok=True)
+                        (staging/'segments').rmdir();staging.rmdir()
+                clip.update(clip_id=event['event_id'],alerts=alerts,shared=len(members)>1,
+                            description='; '.join(dict.fromkeys(a['description'] for a in alerts)))
+                images={image['path']:image for e in members for image in e.get('images',[])}
+                upload={**event,'clip':clip,'images':list(images.values())}
+                for member in members:
+                    member['clip']=clip
+                    with (self.output/'closed_events.jsonl').open('a',encoding='utf-8') as stream:
+                        stream.write(json.dumps(member,ensure_ascii=False,allow_nan=False)+'\n')
+                    self.counts[member['kind']]+=1
+                    monitor.events.remove(member)
+                    monitor.active_events=[e for e in monitor.active_events if e['event'] is not member]
+                if self.uploader is not None and clip['status']=='saved':
+                    atomic_json(self.pending/(event['event_id']+'.json'),upload)
+                self.counts['clip_errors' if clip['status']!='saved' else 'saved_clips']+=1
+        keep=max(0,extent-self.retention_seconds*scale)
+        if monitor is not None:
+            # Protect pre-roll even before an event reaches confirmation.
+            protected=[e.get('first_timestamp_seconds',e['first_frame']/self.fps)*scale if self.vfr else e['first_frame'] for e in monitor.events]
+            for mapping in (monitor.presence,monitor.pairs,monitor.repairs,monitor.model_activities):
+                protected.extend(s['first_timestamp']*scale if self.vfr else s['first_frame'] for s in mapping.values() if not s['alerted'])
+            if protected:keep=min(keep,max(0,min(protected)-monitor.options.pre_seconds*scale))
+        while len(segments)>1 and end_of(segments[0])<=keep:
+            old=segments.pop(0)
+            for key in ('video','records','original_video'):
+                if old.get(key):(self.output/old[key]).unlink(missing_ok=True)
+
+        report={'alert_count':sum(v for k,v in self.counts.items() if k not in ('saved_clips','clip_errors')),
+                'counts':dict(self.counts),'events_file':'closed_events.jsonl',
+                'pending_events':len(monitor.events) if monitor else 0,
+                'recording_retention_seconds':self.retention_seconds}
+        atomic_json(self.output/'events.json',report)
+        self.wake.set()
+        return report
+
+    def close(self):
+        if self.worker:
+            self.wake.set()
+            # Allow a quick local/fake upload to complete; slow jobs remain durable.
+            import time
+            deadline=time.monotonic()+1
+            while time.monotonic()<deadline and any(self.pending.iterdir()):time.sleep(.01)
+        if self.buffer_writer is not None:
+            self.buffer_writer.release()
+            self.buffer_writer=None
+        self.stop.set()
+        self.wake.set()
+        if self.worker:self.worker.join(timeout=1)

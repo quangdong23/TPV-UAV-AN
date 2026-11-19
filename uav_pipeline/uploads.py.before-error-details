@@ -1,0 +1,324 @@
+"""Durable automatic evidence uploads using the TPV multipart API.
+
+Identity and GPS metadata must come from supplied records, never inference.
+"""
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import hashlib
+import json
+import math
+import mimetypes
+import re
+import os
+from pathlib import Path
+import time
+import requests
+from uav_pipeline.video.io import atomic_json
+
+
+BEHAVIORS = {
+    'crowd_gathering_suspected': 'tụ tập trái phép',
+    'sidewalk_encroachment': 'Lấn chiếm vỉa hè',
+    'sign_attachment_suspected': 'đặt biển quảng cáo sai quy định',
+    'motorcycle_repair_suspected': 'sửa xe máy lấn chiếm vỉa hè/lòng lề đường',
+    'vehicle_repair_suspected': 'sửa xe lấn chiếm vỉa hè/lòng lề đường',
+    'vehicle_washing_suspected': 'rửa xe lấn chiếm vỉa hè/lòng lề đường',
+    'street_vending_suspected': 'Bán hàng rong',
+}
+CLASS_BEHAVIORS = {
+    4: 'bày bán bàn ghế lấn chiếm vỉa hè/lòng lề đường', 5: 'bày bán bàn ghế lấn chiếm vỉa hè/lòng lề đường',
+    6: 'Đặt xe bán hàng trên vỉa hè', 7: 'đặt biển quảng cáo sai quy định',
+    10: 'bày bán hàng hoá lấn chiếm vỉa hè/lòng lề đường',
+    11: 'tập kết vật liệu lấn chiếm vỉa hè/lòng lề đường',
+    12: 'đặt máy móc, sửa chữa thiết bị lấn chiếm vỉa hè/lòng lề đường',
+}
+
+
+def behavior_name(event):
+    if event.get('grouped_behavior_name'):
+        return event['grouped_behavior_name']
+    if event.get('evidence',{}).get('behavior_name'):
+        return event['evidence']['behavior_name']
+    if event['kind'] == 'sidewalk_encroachment':
+        classes = set(event.get('class_ids', []))
+        if len(classes) == 1:
+            label = CLASS_BEHAVIORS.get(next(iter(classes)))
+            if label:return label
+    if event['kind'] not in BEHAVIORS:
+        raise ValueError('No configured behavior name for event kind')
+    return BEHAVIORS[event['kind']]
+
+
+class UploadError(RuntimeError):pass
+
+
+class APIError(UploadError):
+    def __init__(self,status,detail=''):
+        self.status=status
+        super().__init__('API HTTP '+str(status)+(': '+detail if detail else ''))
+
+
+class EvidenceUploader:
+    def __init__(self,api_url,api_key,location=None,http=None,sleep=time.sleep):
+        if not api_url.startswith('https://'):
+            raise ValueError('Upload API must use HTTPS')
+        if not api_key:raise ValueError('Missing upload API key')
+        self.api_url=api_url.rstrip('/')
+        self.api_key=api_key
+        self.location=location
+        self.http=http if http is not None else requests.Session()
+        self.sleep=sleep
+
+    @classmethod
+    def from_config(cls,path):
+        config=json.loads(Path(path).read_text())
+        key=os.environ.get('TPV_UPLOAD_API_KEY') or os.environ.get('UPLOAD_API_KEY') or config.get('api_key')
+        return cls(config['api_url'],key,config.get('location'))
+
+    def _event_metadata(self,event):
+        location=event.get('location',self.location)
+        if not isinstance(location,str) or not re.fullmatch(
+                r'\s*[+-]?\d+(?:\.\d+)?\s*,\s*[+-]?\d+(?:\.\d+)?\s*',location):
+            raise UploadError('Explicit GPS location required: latitude, longitude')
+        lat,lon=map(float,location.split(','))
+        if not (-90<=lat<=90 and -180<=lon<=180):
+            raise UploadError('GPS coordinates outside latitude/longitude bounds')
+        violators=event.get('violators')
+        if violators == []:
+            violators=None
+        if violators is not None:
+            if not isinstance(violators,list):
+                raise UploadError('violators must be a list or null')
+            for person in violators:
+                if (not isinstance(person,dict) or
+                        not isinstance(person.get('full_name'),str) or not person['full_name'].strip() or
+                        not isinstance(person.get('citizen_id'),str) or not person['citizen_id'].strip()):
+                    raise UploadError('Each violator requires supplied full_name and citizen_id strings')
+            violators=[{'full_name':p['full_name'],'citizen_id':p['citizen_id']} for p in violators]
+        result={'location':location,'violators':violators}
+        for key in ('camera_id','confidence','ai_result'):
+            if key in event:
+                value=event[key]
+                if key=='camera_id' and (not isinstance(value,str) or not value.strip()):
+                    raise UploadError('camera_id must be a nonempty string')
+                if key=='confidence' and (type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=1):
+                    raise UploadError('confidence must be between 0 and 1')
+                if key=='ai_result' and not isinstance(value,dict):
+                    raise UploadError('ai_result must be an object')
+                result[key]=value
+        return result
+
+    def api(self,method,path,payload=None):
+        response=self.http.request(method,self.api_url+path,
+            headers={'x-api-key':self.api_key},json=payload,timeout=(10,60))
+        if not 200<=response.status_code<300:
+            try:
+                body=response.json()
+                detail=str(body.get('error') or body.get('message') or '')
+                detail=re.sub(r'https?://[^\s]+','[URL]',detail)[:400]
+                detail=detail.replace(self.api_key,'[REDACTED]')
+            except Exception:
+                detail=''
+            raise APIError(response.status_code,detail)
+        return response.json()
+
+    def _part(self,video,number,size,url):
+        with video.open('rb') as stream:
+            stream.seek((number-1)*size)
+            data=stream.read(size)
+        for attempt in range(3):
+            try:
+                # Presigned MinIO URL authorizes this PUT; never forward API key.
+                response=self.http.put(url,data=data,timeout=(15,120))
+                if not 200<=response.status_code<300:
+                    raise UploadError('Video part HTTP '+str(response.status_code))
+                etag=response.headers.get('ETag')
+                if not etag:raise UploadError('Video part missing ETag')
+                return {'part_number':number,'etag':etag}
+            except (requests.RequestException,UploadError):
+                if attempt==2:raise
+                self.sleep(2**(attempt+1))
+
+    def _image(self,path,url,content_type):
+        for attempt in range(3):
+            try:
+                with path.open('rb') as stream:
+                    response=self.http.put(url,data=stream,headers={'Content-Type':content_type},timeout=(15,120))
+                if not 200<=response.status_code<300:
+                    raise UploadError('Evidence image HTTP '+str(response.status_code))
+                return
+            except (requests.RequestException,UploadError):
+                if attempt==2:raise
+                self.sleep(2**(attempt+1))
+
+    def upload_one(self,output,event):
+        output=Path(output).resolve()
+        clip=event.get('clip') or {}
+        if clip.get('status')!='saved':raise UploadError('Evidence clip is not saved')
+        video=(output/clip['path']).resolve()
+        if not video.is_relative_to(output) or not video.is_file() or video.stat().st_size<=0:
+            raise UploadError('Evidence video missing or outside session directory')
+        images=[];image_paths=[]
+        image_items=event.get('images',[]) if event.get('evidence_status') in (None,'ready') and not event.get('evidence_image_error') else []
+        for item in image_items:
+            path=(output/item['path']).resolve()
+            if not path.is_relative_to(output) or not path.is_file() or not 0<path.stat().st_size<=25*1024*1024:
+                raise UploadError('Invalid evidence image')
+            content_type=mimetypes.guess_type(path.name)[0]
+            if content_type not in ('image/jpeg','image/png','image/webp'):
+                raise UploadError('Unsupported evidence image type')
+            image_paths.append(path)
+            images.append({'filename':path.name,'file_size':path.stat().st_size,'content_type':content_type})
+        if len(images)>50:raise UploadError('Too many evidence images')
+        moment=event.get('detected_at')
+        if not moment or datetime.fromisoformat(moment).tzinfo is None:
+            raise UploadError('Event occurrence time with timezone is required; upload time is never substituted')
+        # Convert the same instant, never merely relabel a UTC clock as +07.
+        moment=datetime.fromisoformat(moment).astimezone(ZoneInfo('Asia/Ho_Chi_Minh')).isoformat(timespec='milliseconds')
+        supplied=self._event_metadata(event)
+        metadata={'video':clip['path'],'detected_at':moment,'location':supplied['location'],
+                  'behavior_name':behavior_name(event)}
+        if images:metadata['images']=images
+        if event.get('model_version'):metadata['model_version']=event['model_version']
+        legacy_identity=hashlib.sha256(json.dumps([event['event_id'],metadata],sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:24]
+        metadata.update(supplied,images=images)
+        for field in ('camera_id','confidence','ai_result'):
+            if field in event:
+                value=event[field]
+                if ((field=='camera_id' and (not isinstance(value,str) or not value.strip())) or
+                        (field=='confidence' and (type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=1)) or
+                        (field=='ai_result' and not isinstance(value,dict))):
+                    raise UploadError('Invalid supplied '+field)
+                metadata[field]=value
+                supplied[field]=value
+        identity=hashlib.sha256(json.dumps([event['event_id'],metadata],sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:24]
+        queue=output/'uploads';queue.mkdir(exist_ok=True)
+        record=queue/(identity+'.json')
+        legacy_record=queue/(legacy_identity+'.json')
+        if not record.exists() and legacy_record.exists():
+            record=legacy_record
+        state=json.loads(record.read_text()) if record.exists() else {'metadata':metadata,'state':'pending'}
+        previous={**state['metadata']}
+        previous.setdefault('violators',None)
+        previous.setdefault('images',[])
+        if previous!=metadata:raise UploadError('Upload metadata changed; reconcile existing session before changing it')
+        if state['state']=='ready':return 'already_ready'
+        if state['state'] in ('initiating','initiate_uncertain','completing','complete_uncertain','aborting'):
+            # Without a READ_API_KEY an ambiguous remote commit cannot be safely
+            # reconciled. Never create a duplicate upload by guessing.
+            raise UploadError('Upload outcome uncertain; administrator reconciliation required')
+        try:
+            if images and 'violation_id' in state and not state.get('images_uploaded'):
+                # Old image URLs may have expired. Abort the known incomplete upload
+                # before initiating a replacement; never recreate an uncertain commit.
+                state['state']='aborting';atomic_json(record,state)
+                self.api('POST','/api/uploads/'+state['violation_id']+'/abort')
+                state={'metadata':metadata,'state':'pending'};atomic_json(record,state)
+            if 'violation_id' not in state:
+                state['state']='initiating';atomic_json(record,state)
+                response=self.api('POST','/api/uploads/initiate',{
+                    'filename':video.name,'file_size':video.stat().st_size,'content_type':'video/mp4',
+                    'detected_at':moment,'behavior_name':metadata['behavior_name'],
+                    **supplied,'images':images,
+                    **({'model_version':event['model_version']} if event.get('model_version') else {})})
+                size=response['part_size'];total=response['total_parts']
+                if type(size) is not int or size<=0 or type(total) is not int or total!=math.ceil(video.stat().st_size/size):
+                    raise UploadError('Invalid multipart upload plan')
+                state.update(violation_id=response['violation_id'],part_size=size,total_parts=total,state='uploading')
+                atomic_json(record,state)
+                if images:
+                    targets=response.get('images',[])
+                    if len(targets)!=len(images):raise UploadError('API image upload plan mismatch')
+                    for path,image,target in zip(image_paths,images,targets,strict=True):
+                        self._image(path,target['upload_url'],image['content_type'])
+                    state['images_uploaded']=True
+                    atomic_json(record,state)
+            remote=state['violation_id'];size=state['part_size'];total=state['total_parts']
+            parts=[]
+            # Obtain short-lived URLs only for the current bounded batch.
+            for first in range(1,1 if state.get('completed_parts') else total+1,100):
+                numbers=list(range(first,min(first+100,total+1)))
+                signed=self.api('POST','/api/uploads/'+remote+'/part-urls',{'part_numbers':numbers})
+                urls={item['part_number']:item['url'] for item in signed['parts']}
+                with ThreadPoolExecutor(max_workers=2,thread_name_prefix='evidence-upload') as executor:
+                    parts.extend(executor.map(lambda n:self._part(video,n,size,urls[n]),numbers))
+            state['completed_parts']=state.get('completed_parts') or sorted(parts,key=lambda p:p['part_number'])
+            state['state']='completing';atomic_json(record,state)
+            for attempt in range(4):
+                try:
+                    completed=self.api('POST','/api/uploads/'+remote+'/complete',
+                                       {'parts':state['completed_parts']})
+                    break
+                except APIError as error:
+                    if error.status!=409 or attempt==3:raise
+                    self.sleep(2**(attempt+1))
+            if completed.get('success') is not True or completed.get('status')!='ready':
+                raise UploadError('API has not confirmed ready')
+            if completed.get('violation_id')!=remote:
+                raise UploadError('Completion ID mismatch')
+            state.update(state='ready',result=completed)
+            state.pop('error',None);atomic_json(record,state)
+            return 'ready'
+        except Exception as error:
+            if state['state']=='initiating':state['state']='initiate_uncertain'
+            elif state['state']=='completing':
+                state['state']='retry_pending' if isinstance(error,APIError) and error.status==409 else 'complete_uncertain'
+            elif state['state']=='aborting':state['state']='aborting'
+            else:state['state']='retry_pending'
+            # Never persist requests exception text, keys or signed URLs.
+            state['error']=str(error) if isinstance(error,UploadError) else type(error).__name__
+            atomic_json(record,state)
+            raise UploadError(state['error']) from None
+
+    def upload_events(self,output,events):
+        events=list(events)
+        counts={'ready':0,'already_ready':0,'failed':0}
+        images_by_clip={}
+        for row in events:
+            path=(row.get('clip') or {}).get('path')
+            images_by_clip.setdefault(path,{})
+            for image in row.get('images',[]):
+                images_by_clip[path][image['path']]=image
+        seen=set()
+        for event in events:
+            clip=event.get('clip') or {}
+            key=clip.get('path')
+            if clip.get('alerts') and key and key in seen:
+                continue
+            if key and clip.get('alerts'):seen.add(key)
+            if clip.get('alerts'):
+                event={**event,'event_id':clip['clip_id'],
+                       'grouped_behavior_name':clip['description'],
+                       'images':list(images_by_clip.get(key,{}).values())}
+            try:
+                result=self.upload_one(output,event);counts[result]+=1
+                print('[upload] Evidence '+result,flush=True)
+            except Exception as error:
+                counts['failed']+=1
+                print('[upload] Evidence retained locally; '+(str(error) if isinstance(error,UploadError) else type(error).__name__),flush=True)
+        atomic_json(Path(output)/'upload_summary.json',counts)
+        return counts
+
+
+def main(argv=None):
+    from uav_pipeline.paths import PROJECT_ROOT
+    parser=argparse.ArgumentParser(description='Retry saved evidence uploads without rerunning AI')
+    parser.add_argument('--session',type=Path,required=True)
+    parser.add_argument('--config',type=Path,default=PROJECT_ROOT/'configs/upload_api.json')
+    args=parser.parse_args(argv)
+    report=json.loads((args.session/'events.json').read_text())
+    if report.get('events_file') == 'closed_events.jsonl':
+        def archived_events():
+            with (args.session/'closed_events.jsonl').open(encoding='utf-8') as stream:
+                for line in stream:
+                    yield json.loads(line)
+        events=archived_events()
+    else:
+        events=report['events']
+    result=EvidenceUploader.from_config(args.config).upload_events(args.session,events)
+    return 1 if result['failed'] else 0
+
+
+if __name__=='__main__':raise SystemExit(main())

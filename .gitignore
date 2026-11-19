@@ -1,0 +1,24 @@
+# Local environments and generated artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.cache/
+outputs/
+models/*.pt
+models/*.ts
+data/samples/
+datasets/
+runs/
+build/
+dist/
+*.egg-info/
+.vscode/
+models/
+.tools/
+*.log
+# Local live source credentials
+configs/rtmp_input.txt
+configs/rtmp_output.txt
+
+configs/upload_api.json
+data/
